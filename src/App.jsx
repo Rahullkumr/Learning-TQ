@@ -1,9 +1,8 @@
-import './App.css'
-
+import StudentCrud from './StudentCrud';
 function App() {
   return (
     <>
-      <h1>Learning Tanstack Query</h1>
+      <StudentCrud />
     </>
   )
 }
