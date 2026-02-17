@@ -1,115 +1,74 @@
-# Simple CRUD operations for Student
+# Student Management with TanStack Query 🚀
 
-A simple React application for managing student records with full CRUD (Create, Read, Update, Delete) functionality. This project demonstrates modern React practices including hooks (`useState`, `useEffect`) and API integration using `axios`.
+This branch demonstrates the migration from manual state management (using `useEffect` and `useState`) to **TanStack Query (v5)** for handling server state.
 
-## 🚀 Features
+## 💡 Core Concepts Implemented
 
--   **Create**: Add new students with Name, Email, Phone, and Age.
--   **Read**: View a comprehensive list of all students.
--   **Update**: Edit existing student details.
--   **Delete**: Remove student records.
--   **Responsive UI**: Clean, dark-themed interface built for usability.
--   **Real-time Feedback**: Immediate visual updates upon successful operations.
+### 1. Global Provider Setup
+The application is wrapped in a `QueryClientProvider` in `main.jsx`. This initializes the Query Client which manages all caching and background background syncing.
 
-## 🛠️ Technologies Used
+```javascript
+/* src/main.jsx */
+const queryClient = new QueryClient();
 
--   **Frontend Framework**: [React](https://react.dev/)
--   **Build Tool**: [Vite](https://vitejs.dev/)
--   **HTTP Client**: [Axios](https://axios-http.com/)
--   **Styling**: Custom CSS
--   **Linting**: ESLint
-
-## 📋 Prerequisites
-
-Before you begin, ensure you have the following installed:
--   [Node.js](https://nodejs.org/) (v16 or higher)
--   [npm](https://www.npmjs.com/) or [Bun](https://bun.sh/)
-
-## ⚙️ Installation
-
-1.  **Clone the repository**
-    ```bash
-    git clone <repository-url>
-    cd Learning-TQ
-    ```
-
-2.  **Install dependencies**
-    ```bash
-    npm install
-    # or
-    bun install
-    ```
-
-## 🏃‍♂️ Running the Application
-
-### 1. Start the Backend API
-This application expects a REST API running at `http://localhost:3000/students`.
-
-If you don't have a backend ready, you can quickly mock one using `json-server`:
-
-```bash
-# Install json-server globally
-npm install -g json-server
-
-# Create a db.json file
-echo '{ "students": [] }' > db.json
-
-# Start the server
-json-server --watch db.json --port 3000
+<QueryClientProvider client={queryClient}>
+  <App />
+</QueryClientProvider>
 ```
 
-### 2. Start the Frontend Development Server
-```bash
-npm run dev
-# or
-bun dev
+### 2. Fetching Data (`useQuery`)
+Instead of manually creating loading states and using `useEffect`, we filter data using the `useQuery` hook.
+
+*   **`queryKey`**: `['students']` - A unique key used to cache and track this specific data.
+*   **`queryFn`**: The function that actually fetches data (using Axios).
+*   **Automatic States**: `isLoading`, `isError`, and `data` are provided out-of-the-box.
+
+```javascript
+/* src/StudentCrud.jsx */
+const { data: students, isLoading, isError } = useQuery({
+    queryKey: ['students'],
+    queryFn: getStudents,
+});
 ```
 
-The application will be available at `http://localhost:5173`.
+### 3. Modifying Data (`useMutation`)
+For Create, Update, and Delete operations, we use the `useMutation` hook. This handles the lifecycle of an asynchronous change.
 
-## 📡 API Endpoints
+*   **`mutationFn`**: The function that performs the API call (POST, PUT, DELETE).
+*   **`onSuccess`**: A callback that runs after the API call finishes successfully.
 
-The application interacts with the following endpoints:
+```javascript
+/* src/StudentCrud.jsx */
+const createMutation = useMutation({
+    mutationFn: createStudent,
+    onSuccess: () => {
+        // ✨ Magic happens here:
+        // We tell React Query that 'students' data is now stale.
+        // It automatically re-fetches the fresh list in the background!
+        queryClient.invalidateQueries({ queryKey: ['students'] });
+    }
+});
+```
 
-| Method | Endpoint | Description |
+### 4. Automatic Refetching (Cache Invalidation)
+The most powerful feature implemented here is **Query Invalidation**.
+
+In the previous version, after adding a student, we had to manually update the local `students` array state. With TanStack Query, we simply call:
+
+```javascript
+queryClient.invalidateQueries({ queryKey: ['students'] });
+```
+
+This ensures our UI is always in sync with the server without complex manual state logic.
+
+## ⚡ Main Benefits Over `useEffect`
+
+| Feature | Manual (`useEffect`) | TanStack Query |
 | :--- | :--- | :--- |
-| `GET` | `/students` | Retrieve all students |
-| `POST` | `/students` | Create a new student |
-| `PUT` | `/students/:id` | Update an existing student |
-| `DELETE` | `/students/:id` | Delete a student |
+| **Boilerplate** | High (Loading/Error states manually managed) | Low (Handled by hook) |
+| **Caching** | None (Fetches on every mount) | Automatic (Configurable stale times) |
+| **Updates** | Manual array manipulation | Automatic Refetching |
+| **Deduping** | No (Multiple requests possible) | Yes (Requests deduped) |
 
-### Payload Structure
-**Create/Update Student:**
-```json
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "phone": "+1234567890",
-  "age": 25,
-  "created_by": 1
-}
-```
-
-## 📂 Project Structure
-
-```
-Learning-TQ/
-├── public/
-├── src/
-│   ├── assets/
-│   ├── App.jsx          # Main application component
-│   ├── main.jsx         # Entry point
-│   ├── StudentCrud.jsx  # Student CRUD logic and UI
-│   ├── StudentCrud.css  # Styles for StudentCrud component
-│   └── index.css        # Global styles
-├── package.json
-└── README.md
-```
-
-## 🤝 Contributing
-
-1.  Fork the repository
-2.  Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4.  Push to the branch (`git push origin feature/AmazingFeature`)
-5.  Open a Pull Request
+---
+*Check `src/StudentCrud.jsx` to see the full implementation.*

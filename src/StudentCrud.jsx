@@ -1,11 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import './StudentCrud.css';
 
 const API_URL = 'http://localhost:3000/students'; // Base URL for API
 
+const getStudents = async () => {
+    const response = await axios.get(API_URL);
+    return response.data;
+};
+
+const createStudent = async (student) => {
+    return await axios.post(API_URL, student);
+};
+
+const updateStudent = async ({ id, ...student }) => {
+    return await axios.put(`${API_URL}/${id}`, student);
+};
+
+const deleteStudent = async (id) => {
+    return await axios.delete(`${API_URL}/${id}`);
+};
+
 const StudentCrud = () => {
-    const [students, setStudents] = useState([]);
+    const queryClient = useQueryClient();
 
     const [formData, setFormData] = useState({
         name: '',
@@ -17,19 +35,52 @@ const StudentCrud = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [currentId, setCurrentId] = useState(null);
 
-    // Fetch students on component mount
-    useEffect(() => {
-        fetchStudents();
-    }, []);
+    // Queries
+    const { data: students = [], isLoading, isError, error } = useQuery({
+        queryKey: ['students'],
+        queryFn: getStudents,
+    });
 
-    const fetchStudents = async () => {
-        try {
-            const response = await axios.get(API_URL);
-            setStudents(response.data);
-        } catch (error) {
-            console.error('Error fetching students:', error);
+    // Mutations
+    const createMutation = useMutation({
+        mutationFn: createStudent,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            alert("Student created successfully!");
+            setFormData({ name: '', email: '', phone: '', age: '' });
+        },
+        onError: (error) => {
+            console.error("Error creating student:", error);
+            alert("Failed to create student.");
         }
-    };
+    });
+
+    const updateMutation = useMutation({
+        mutationFn: updateStudent,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            alert("Student updated successfully!");
+            setFormData({ name: '', email: '', phone: '', age: '' });
+            setIsEditing(false);
+            setCurrentId(null);
+        },
+        onError: (error) => {
+            console.error("Error updating student:", error);
+            alert("Failed to update student.");
+        }
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: deleteStudent,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['students'] });
+            alert("Student deleted successfully!");
+        },
+        onError: (error) => {
+            console.error("Error deleting student:", error);
+            alert("Failed to delete student.");
+        }
+    });
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -39,7 +90,7 @@ const StudentCrud = () => {
         });
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = (e) => {
         e.preventDefault();
 
         if (!formData.name || !formData.email || !formData.phone || !formData.age) {
@@ -53,20 +104,10 @@ const StudentCrud = () => {
             created_by: 1 // Hardcoded as per requirement
         };
 
-        try {
-            if (isEditing) {
-                await axios.put(`${API_URL}/${currentId}`, payload);
-                setIsEditing(false);
-                setCurrentId(null);
-            } else {
-                await axios.post(API_URL, payload);
-            }
-            // Refresh list and clear form
-            fetchStudents();
-            setFormData({ name: '', email: '', phone: '', age: '' });
-        } catch (error) {
-            console.error('Error saving student:', error);
-            alert('Failed to save student. See console for details.');
+        if (isEditing) {
+            updateMutation.mutate({ id: currentId, ...payload });
+        } else {
+            createMutation.mutate(payload);
         }
     };
 
@@ -81,17 +122,14 @@ const StudentCrud = () => {
         setCurrentId(student.id);
     };
 
-    const handleDelete = async (id) => {
+    const handleDelete = (id) => {
         if (window.confirm('Are you sure you want to delete this student?')) {
-            try {
-                await axios.delete(`${API_URL}/${id}`);
-                fetchStudents();
-            } catch (error) {
-                console.error('Error deleting student:', error);
-                alert('Failed to delete student.');
-            }
+            deleteMutation.mutate(id);
         }
     };
+
+    if (isLoading) return <div className="loading">Loading students...</div>;
+    if (isError) return <div className="error">Error: {error.message}</div>;
 
     return (
         <div className="student-crud-container">
@@ -140,8 +178,8 @@ const StudentCrud = () => {
                         className="form-input"
                     />
                 </div>
-                <button type="submit" className={`btn ${isEditing ? 'btn-update' : 'btn-add'}`}>
-                    {isEditing ? 'Update Student' : 'Add Student'}
+                <button type="submit" className={`btn ${isEditing ? 'btn-update' : 'btn-add'}`} disabled={createMutation.isPending || updateMutation.isPending}>
+                    {isEditing ? (updateMutation.isPending ? 'Updating...' : 'Update Student') : (createMutation.isPending ? 'Adding...' : 'Add Student')}
                 </button>
             </form>
 
@@ -173,8 +211,9 @@ const StudentCrud = () => {
                                     <button
                                         onClick={() => handleDelete(student.id)}
                                         className="btn btn-delete"
+                                        disabled={deleteMutation.isPending && deleteMutation.variables === student.id}
                                     >
-                                        Delete
+                                        {deleteMutation.isPending && deleteMutation.variables === student.id ? 'Deleting...' : 'Delete'}
                                     </button>
                                 </td>
                             </tr>
