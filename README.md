@@ -1,4 +1,4 @@
-# Simple CRUD operations for Student
+# Simple CRUD operations for Student Entity
 
 A simple React application for managing student records with full CRUD (Create, Read, Update, Delete) functionality. This project demonstrates modern React practices including hooks (`useState`, `useEffect`) and API integration using `axios`.
 
